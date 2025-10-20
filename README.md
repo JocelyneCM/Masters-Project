@@ -71,3 +71,7 @@ export default defineConfig([
   },
 ])
 ```
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+Member - Yusrat Adebisi Jimoh
+Member - Jocelyne C. M.
