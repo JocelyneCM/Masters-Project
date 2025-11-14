@@ -3,14 +3,12 @@ import React from "react";
 interface TypingStatsProps {
   timeLeft: number;
   WPM: number;
-  CPM: number;
   onReset: () => void;
 }
 
 const TypingStats: React.FC<TypingStatsProps> = ({
   timeLeft,
   WPM,
-  CPM,
   onReset,
 }) => {
   return (
@@ -20,9 +18,6 @@ const TypingStats: React.FC<TypingStatsProps> = ({
       </p>
       <p>
         <b>WPM:</b> {WPM}
-      </p>
-      <p>
-        <b>CPM:</b> {CPM}
       </p>
       <button onClick={onReset} className="btn">
         Try Again

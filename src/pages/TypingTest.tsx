@@ -3,33 +3,43 @@ import TopButtons from "../components/TopButtons";
 import TypingBox from "../components/TypingBox.tsx";
 import TypingInput from "../components/TypingInput.tsx";
 import TypingStats from "../components/TypingStats.tsx";
+import ExportButton from "../components/ExportButton.tsx";
 
 const TypingTest: React.FC = () => {
   const sentences = [
-    "The quick brown fox jumps over the lazy dog.",
-    "Test sentence",
-    "Pack my box with five dozen liquor jugs.",
-    "Sphinx of black quartz, judge my vow.",
-    "How vexingly quick daft zebras jump!",
+    "The pharaohs of ancient Egypt built magnificent pyramids.",
+    "These pyramids served as tombs for their kings and queens.",
+    "They have been admired for centuries.",
+    "and are a site that draws millions of tourists each year.",
+    "archeologists continue to study them to learn more about them",
   ];
 
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [userInput, setUserInput] = useState("");
   const [timeLeft, setTimeLeft] = useState(60);
   const [WPM, setWPM] = useState(0);
-  const [CPM, setCPM] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  
+  const [totalCorrectChars, setTotalCorrectChars] = useState(0);
+  const [totalCharsTyped, setTotalCharsTyped] = useState(0);
+  const [errors, setErrors] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+  const endTimeRef = useRef<number | null>(null);
+  const testCompleted = useRef(false);
 
   const initTyping = () => {
     if (!isTyping) {
       setIsTyping(true);
+      startTimeRef.current = Date.now();
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current!);
             setIsTyping(false);
+            endTimeRef.current = Date.now();
+            testCompleted.current = true;
             return 0;
           }
           return prev - 1;
@@ -40,32 +50,86 @@ const TypingTest: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    const currentSentence = sentences[currentSentenceIndex];
+
+    if (value.length > currentSentence.length) {
+      return;
+    }
+
+    // Track total characters typed
+    if (value.length > userInput.length) {
+      setTotalCharsTyped(prev => prev + 1);
+    }
+
     setUserInput(value);
     initTyping();
 
-    const elapsedTime = 60 - timeLeft;
-    const charsTyped = value.length;
-
-    if (elapsedTime > 0) {
-      const cpm = Math.round((charsTyped / elapsedTime) * 60);
-      const wpm = Math.round(cpm / 5);
-      setCPM(cpm);
-      setWPM(wpm);
-    } else {
-      setCPM(0);
-      setWPM(0);
+    // Count correct characters and errors in current input
+    let correctInCurrent = 0;
+    let errorsInCurrent = 0;
+    for (let i = 0; i < value.length; i++) {
+      if (value[i] === currentSentence[i]) {
+        correctInCurrent++;
+      } else {
+        errorsInCurrent++;
+      }
     }
 
-    const currentSentence = sentences[currentSentenceIndex];
-    if (value.length >= currentSentence.length) {
+    // Update errors (only count new errors)
+    if (value.length > userInput.length && errorsInCurrent > 0) {
+      setErrors(prev => prev + 1);
+    }
+
+    const totalCorrect = totalCorrectChars + correctInCurrent;
+    const elapsedMs = Date.now() - (startTimeRef.current || Date.now());
+    const elapsedMinutes = Math.max(elapsedMs / 60000, 0.1);
+
+    const wpm = Math.round((totalCorrect / 5) / elapsedMinutes);
+    setWPM(wpm);
+
+    if (value.length === currentSentence.length) {
+      setTotalCorrectChars(totalCorrect);
+
       if (currentSentenceIndex < sentences.length - 1) {
         setCurrentSentenceIndex((prev) => prev + 1);
         setUserInput("");
       } else {
         clearInterval(timerRef.current!);
         setIsTyping(false);
+        endTimeRef.current = Date.now();
+        testCompleted.current = true;
       }
     }
+  };
+
+  const exportTestData = () => {
+    const testData = {
+      timestamp: new Date().toISOString(),
+      duration: startTimeRef.current && endTimeRef.current 
+        ? (endTimeRef.current - startTimeRef.current) / 1000 
+        : 60 - timeLeft,
+      wpm: WPM,
+      accuracy: totalCharsTyped > 0 
+        ? ((totalCorrectChars / totalCharsTyped) * 100).toFixed(2) 
+        : "0.00",
+      totalCharactersTyped: totalCharsTyped,
+      correctCharacters: totalCorrectChars,
+      errors: errors,
+      sentencesCompleted: currentSentenceIndex + (userInput.length === sentences[currentSentenceIndex].length ? 1 : 0),
+      totalSentences: sentences.length,
+      completed: testCompleted.current || timeLeft === 0
+    };
+
+    const jsonStr = JSON.stringify(testData, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `typing-test-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const resetGame = () => {
@@ -73,9 +137,14 @@ const TypingTest: React.FC = () => {
     setUserInput("");
     setTimeLeft(60);
     setWPM(0);
-    setCPM(0);
     setIsTyping(false);
     setCurrentSentenceIndex(0);
+    setTotalCorrectChars(0);
+    setTotalCharsTyped(0);
+    setErrors(0);
+    startTimeRef.current = null;
+    endTimeRef.current = null;
+    testCompleted.current = false;
     inputRef.current?.focus();
   };
 
@@ -105,9 +174,11 @@ const TypingTest: React.FC = () => {
           <TypingStats
             timeLeft={timeLeft}
             WPM={WPM}
-            CPM={CPM}
             onReset={resetGame}
           />
+          {(timeLeft === 0 || testCompleted.current) && (
+            <ExportButton onExport={exportTestData} />
+          )}
         </div>
       </div>
     </div>
